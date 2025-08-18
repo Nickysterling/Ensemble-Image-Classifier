@@ -1,0 +1,3 @@
+python train.py --model_type <alexnet|vgg16|resnet18> [--e <epochs>] [--b <batch_size>] [--lr <learning_rate>] [--wd <weight_decay>]
+
+Example: python train.py --model_type vgg16 --b 32 --e 30

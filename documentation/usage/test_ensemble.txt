@@ -1,0 +1,10 @@
+python test_ensemble.py --alexnet_weights <path_to_alexnet_weights> --vgg16_weights <path_to_vgg16_weights> --resnet18_weights <path_to_resnet18_weights> --data_dir <path_to_dataset> --method <max_prob|avg_prob|majority_vote>
+
+Maximum Probability
+python ensemble_test.py --alexnet_weights outputs\model_weights\alexnet_weights_E30_B32.pth --vgg16_weights outputs\model_weights\vgg16_weights_E30_B32.pth --resnet18_weights outputs\model_weights\resnet18_weights_E30_B16.pth --method max_prob --data_dir data
+
+Average Probability
+python ensemble_test.py --alexnet_weights outputs\model_weights\alexnet_weights_E30_B32.pth --vgg16_weights outputs\model_weights\vgg16_weights_E30_B32.pth --resnet18_weights outputs\model_weights\resnet18_weights_E30_B16.pth --method avg_prob --data_dir data
+
+Majority Voting
+python ensemble_test.py --alexnet_weights outputs\model_weights\alexnet_weights_E30_B32.pth --vgg16_weights outputs\model_weights\vgg16_weights_E30_B32.pth --resnet18_weights outputs\model_weights\resnet18_weights_E30_B16.pth --method majority_vote --data_dir data

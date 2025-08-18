@@ -1,0 +1,10 @@
+python test.py --model_type <alexnet|vgg16|resnet18> --weights_path <path_to_weights_file> --data_dir <path_to_dataset_directory>
+
+AlexNet
+python test.py --model_type alexnet --weights_path outputs/model_weights/alexnet_weights_E30_B32.pth --data_dir ./data
+
+ResNet18
+python test.py --model_type resnet18 --weights_path outputs/model_weights/resnet18_weights_E30_B16.pth --data_dir ./data
+
+VGG16
+python test.py --model_type vgg16 --weights_path outputs/model_weights/vgg16_weights_E30_B32.pth --data_dir ./data

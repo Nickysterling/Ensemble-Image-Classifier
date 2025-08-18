@@ -1,0 +1,8 @@
+04:35:23 AM Epoch 5, Batch Size: 32, Learning Rate: 0.0001, Weight Decay: 0.01
+Training loss: 1.2821, Validation loss: 1.6779
+Top-1 Error Rate: 45.96%, Top-5 Error Rate: 17.17%
+
+05:27:03 AM Epoch 30, Batch Size: 32, Learning Rate: 0.0001, Weight Decay: 0.01
+Training loss: 0.0014, Validation loss: 1.8333
+Top-1 Error Rate: 38.70%, Top-5 Error Rate: 15.31%
+
