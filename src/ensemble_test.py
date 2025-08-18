@@ -1,11 +1,13 @@
 # ensemble_test.py
 
+import argparse
+
+import numpy as np
+import matplotlib.pyplot as plt
+
 import torch
 from torch import nn
 from torchvision import transforms, datasets, models
-import matplotlib.pyplot as plt
-import numpy as np
-import argparse
 
 # Load the model and its weights
 def load_model(model_type, weights_path, device):
