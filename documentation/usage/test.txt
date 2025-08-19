@@ -1,0 +1,29 @@
+Usage Guide for test.py
+========================
+
+Command:
+--------
+python test.py [OPTIONS]
+
+Options:
+--------
+--m <str>          Model type to test. Choices: alexnet, vgg16, resnet18
+--w <str>          Path to the saved model weights file (.pth)
+
+Description:
+------------
+This script tests a saved model on the CIFAR-100 dataset.
+
+It allows:
+- Overall Top-1 and Top-5 accuracy calculation
+- Interactive testing of individual images by index (shows true label and top-5 predictions)
+
+The script automatically selects the device (CPU/GPU) and loads the dataset with batch size 1 for testing.
+
+Examples:
+---------
+# Test an archived model:
+python test.py --m resnet18 --w archive\model_weights\resnet18_weights_E30_B8.pth
+
+# Test a new model:
+python test.py --m vgg16 --w outputs\model_weights\vgg16_weights_E50_B128.pth

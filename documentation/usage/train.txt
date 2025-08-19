@@ -1,0 +1,36 @@
+Usage Guide for train.py
+========================
+
+Command:
+--------
+python train.py [OPTIONS]
+
+Options:
+--------
+--m <str>          Model to train. Choices: alexnet, vgg16, resnet18
+--e <int>          Number of epochs to train (default: 50)
+--b <int>          Batch size (default: 128)
+--lr <float>       Learning rate (default: 0.0001)
+--wd <float>       Weight decay (default: 0.01)
+
+Description:
+------------
+This script trains a chosen model (alexnet, vgg16, or resnet18) on the CIFAR-100 dataset.
+
+It saves:
+- Model checkpoints in: outputs\model_weights
+- Loss plots in: outputs\plots
+- Training logs in: outputs\logs
+
+The training includes Top-1 and Top-5 accuracy calculation on the validation set.
+
+Examples:
+---------
+# Train the model with default settings (resnet18 example):
+python train.py --m resnet18
+
+# Train for 50 epochs with batch size 16 (vgg16 example):
+python train.py --m vgg16 --e 50 --b 16
+
+# Train with custom learning rate and weight decay (alexnet example):
+python train.py --m alexnet --lr 0.001 --wd 0.0001 --e 40 --b 32

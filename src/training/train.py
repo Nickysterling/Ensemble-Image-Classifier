@@ -1,6 +1,7 @@
 # train.py
 
 import os
+import sys
 
 import time
 import datetime
@@ -9,10 +10,12 @@ import argparse
 import matplotlib.pyplot as plt
 
 import torch
-from torch import nn, optim
 from torch.amp import autocast, GradScaler
-from torchvision import transforms, datasets, models
 from torchsummary import summary
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils import transformation, file_paths, get_dataloaders, setup_components
+from models.model_factory import load_model
 
 # -----------------------------
 # Default configuration
@@ -22,12 +25,14 @@ DEFAULT_BATCH_SIZE = 128
 DEFAULT_LR = 1e-4
 DEFAULT_WEIGHT_DECAY = 1e-2
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "outputs")
-MODEL_DIR = os.path.join(OUTPUT_DIR, "model_weights")
-PLOT_DIR = os.path.join(OUTPUT_DIR, "plots")
-LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
+
+paths = file_paths()
+DATA_DIR = paths["DATA_DIR"]
+OUTPUT_DIR = paths["OUTPUT_DIR"]
+MODEL_DIR = paths["MODEL_DIR"]
+PLOT_DIR = paths["PLOT_DIR"]
+LOG_DIR = paths["LOG_DIR"]
+
 
 # Initialize the GradScaler
 scaler = GradScaler()
@@ -36,73 +41,27 @@ scaler = GradScaler()
 # Utility Functions
 # ------------------------------
 
-# Initialize model weights with Xavier uniform
-def init_weights(m):
-    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-        torch.nn.init.xavier_uniform_(m.weight)
-        if m.bias is not None:
-            m.bias.data.fill_(0.01)
+def log_details(log_path, message):
+    with open(log_path, "a") as f:
+        f.write(message + "\n")
+    print(f"Saved log to: {log_path}")
 
 
-# Initialize model, optimizer, scheduler, and loss function
-def setup_model(device, args):
-    # Load the model using args
-    if args.model_type == "alexnet":
-        model = models.alexnet(weights=None)
-        model.classifier = nn.Sequential(
-        nn.Dropout(p=0.7),
-        nn.Linear(256 * 6 * 6, 2048),
-        nn.ReLU(inplace=True),
-        nn.Dropout(p=0.7),
-        nn.Linear(2048, 1024),
-        nn.ReLU(inplace=True),
-        nn.Linear(1024, 100)
-        )
-    elif args.model_type == "vgg16":
-        model = models.vgg16(weights=None)
-        model.classifier = nn.Sequential(
-            nn.Dropout(p=0.7),  
-            nn.Linear(512 * 7 * 7, 2048),  
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.7),
-            nn.Linear(2048, 1024),  
-            nn.ReLU(inplace=True),
-            nn.Linear(1024, 100)
-        )
-    elif args.model_type == "resnet18":
-        model = models.resnet18(weights=None)
-        model.fc = nn.Linear(model.fc.in_features, 100)
-
-    model.to(device)
-    model.apply(init_weights)
-
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min')
-    loss_fn = nn.CrossEntropyLoss()
-    
-    return model, optimizer, scheduler, loss_fn
+def save_model(model, path, best_val_loss, current_val_loss):
+    if current_val_loss < best_val_loss:
+        torch.save(model.state_dict(), path)
+        print(f"Saved model to: {path}")
+        return current_val_loss
+    return best_val_loss
 
 
-# Create training and validation datasets with optional augmentations
-def get_dataloaders(transform, args):
-    # Load datasets
-    train_dataset = datasets.CIFAR100(root=DATA_DIR, train=True, download=True, transform=transform)
-    test_dataset = datasets.CIFAR100(root=DATA_DIR, train=False, download=True, transform=transform)
-
-    # Create data loaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.b, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.b, shuffle=False)
-    
-    return train_loader, val_loader
-
-
-# Plot training and validation losses with localization statistics.
+# Plot train and val loss
 def plot_losses(train_losses, val_losses, total_val_images, total_training_time, 
                 top1_acc, top5_acc, plot_path):
     plt.figure(figsize=(12, 7))
     plt.clf()
 
-    # Plot average train and validation losses
+    # Plot avg train and val losses
     plt.plot(train_losses, label='Train Loss')
     plt.plot(val_losses, label='Validation Loss')
 
@@ -113,17 +72,18 @@ def plot_losses(train_losses, val_losses, total_val_images, total_training_time,
     minutes, seconds = divmod(total_training_time, 60)
     avg_time_per_image = (total_training_time / total_val_images) * 1000
 
-    # Add statistics as text at the bottom of the plot (below the epoch label)
+    # Add stats at bottom of plot
     stats_text = (f"Total Runtime: {int(minutes)} min, {int(seconds)} sec, Avg Time/Test Image: {avg_time_per_image:.2f} ms\n"
                     f"Avg Train Loss: {train_losses[-1]:.4f}, Avg Val Loss: {val_losses[-1]:.4f}\n"
                     f"Top-1 Acc: {top1_acc:.2f}%, Top-5 Acc: {top5_acc:.2f}%")
 
-    # Position the text at the bottom of the figure
+    # Position text at bottom of figure
     plt.figtext(0.5, -0.05, stats_text, wrap=True, horizontalalignment='center', fontsize=10,
                 bbox=dict(facecolor='white', alpha=0.5))
 
-    # Add a title to the plot
+    # Add title
     plt.title(f"Training Results\nLoss Plot: {plot_path}")
+    
     print('Saving plot to:', plot_path, '\n')
     plt.savefig(plot_path, bbox_inches="tight")
 
@@ -132,7 +92,7 @@ def plot_losses(train_losses, val_losses, total_val_images, total_training_time,
 # Training Loop
 # ------------------------------
 
-def train_model(model, optimizer, scheduler, loss_fn, train_loader, val_loader, args,
+def train_model(model, optimizer, scheduler, loss_fn, train_loader, val_loader,
                 device='cpu', n_epochs=30, model_path=None, plot_path=None, log_path=None):
     
     # Lists to hold training and validation losses for each epoch
@@ -226,17 +186,11 @@ def train_model(model, optimizer, scheduler, loss_fn, train_loader, val_loader, 
         )
         print(log_message.strip())
 
-        # Save log
-        with open(log_path, "a") as log_file:
-            log_file.write(log_message + "\n")
-        print(f"\nSaved log to: {log_path}")
-
         # Save model
-        if val_losses[-1] < best_val_loss:
-            best_val_loss = val_losses[-1]
-            if model_path is not None:
-                torch.save(model.state_dict(), model_path)
-                print(f"Saved model to: {model_path}")
+        best_val_loss = save_model(model, model_path, best_val_loss, val_losses[-1])
+        
+        # Log details
+        log_details(log_path, log_message)
 
         # Total number of val images
         total_val_images = len(val_loader.dataset)
@@ -255,7 +209,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Command-line arguments
-    parser.add_argument("--model_type", type=str, choices=["alexnet", "vgg16", "resnet18"], required=True, help="Model to Train")
+    parser.add_argument("--m", type=str, choices=["alexnet", "vgg16", "resnet18"], required=True, help="Model to Train")
     parser.add_argument('--e', type=int, default=DEFAULT_EPOCHS, help="Number of Epochs to Train")
     parser.add_argument('--b', type=int, default=DEFAULT_BATCH_SIZE, help="Batch Size")
     parser.add_argument('--lr', type=float, default=DEFAULT_LR, help="Learning Rate")
@@ -274,7 +228,7 @@ def main():
 
     # Print the training configuration with bold text
     print(f"\033[1mRunning main with the following parameters:\033[0m\n"
-          f"Model: {args.model_type}\nEpochs: {args.e}\nBatch Size: {args.b}\n"
+          f"Model: {args.m}\nEpochs: {args.e}\nBatch Size: {args.b}\n"
           f"Learning Rate: {args.lr}\nWeight Decay: {args.wd}\n")
     
     # Set device to GPU if available, otherwise use CPU
@@ -282,29 +236,25 @@ def main():
     print('Running Model using Device: ', device)
 
     # Load model
-    model, optimizer, scheduler, loss_fn = setup_model(device, args)
+    model = load_model(model_type=args.m, device=device, num_classes=100)
+
+    optimizer, scheduler, loss_fn = setup_components(model, args)
 
     # Model summary
     summary(model, input_size=(3, 224, 224))
 
     # Data transformations
-    transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])])
+    transform = transformation()
 
     # Data loaders
-    train_loader, val_loader = get_dataloaders(transform, args)
+    train_loader, val_loader = get_dataloaders(transform, args.b)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
     # File paths
-    model_path = os.path.join(MODEL_DIR, f"{args.model_type}_weights_E{args.e}_B{args.b}.pth")
-    plot_path = os.path.join(PLOT_DIR, f"{args.model_type}_loss_E{args.e}_B{args.b}.png")
-    log_path  = os.path.join(LOG_DIR, f"{args.model_type}_loss_E{args.e}_B{args.b}.txt")
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(MODEL_DIR, exist_ok=True)
-    os.makedirs(PLOT_DIR, exist_ok=True)
-    os.makedirs(LOG_DIR, exist_ok=True)
+    model_path = os.path.join(MODEL_DIR, f"{args.m}_weights_E{args.e}_B{args.b}.pth")
+    plot_path = os.path.join(PLOT_DIR, f"{args.m}_loss_E{args.e}_B{args.b}.png")
+    log_path  = os.path.join(LOG_DIR, f"{args.m}_E{args.e}_B{args.b}_{timestamp}.txt")
 
     # Start training
     train_model(
@@ -314,7 +264,6 @@ def main():
         loss_fn=loss_fn,
         train_loader=train_loader,
         val_loader=val_loader,
-        args=args,
         device=device,
         n_epochs=args.e,
         model_path=model_path,

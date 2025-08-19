@@ -1,0 +1,34 @@
+Usage Guide for test.py
+========================
+
+Command:
+--------
+python test.py [OPTIONS]
+
+Options:
+--------
+--an <str>       Path to the saved AlexNet weights file (.pth)
+--vgg <str>      Path to the saved VGG16 weights file (.pth)
+--res <str>      Path to the saved ResNet18 weights file (.pth)
+--m <str>        Ensemble method to use. Choices: max_prob, avg_prob, majority_vote
+
+Description:
+------------
+This script tests an ensemble of AlexNet, VGG16, and ResNet18 on the CIFAR-100 dataset.
+
+It allows:
+- Computing overall Top-1 and Top-5 accuracy for the ensemble
+- Interactive testing of individual images by index (shows true label and top-5 predictions)
+
+The script automatically selects the device (CPU/GPU) and loads the dataset with batch size 1 for testing.
+
+Examples:
+---------
+# Ensemble using max probability method:
+python ensemble_test.py --an ./MODEL_DIR/alexnet.pth --vgg ./MODEL_DIR/vgg16.pth --res ./MODEL_DIR/resnet18.pth --m max_prob
+
+# Ensemble using average probability method:
+python ensemble_test.py --an ./MODEL_DIR/alexnet.pth --vgg ./MODEL_DIR/vgg16.pth --res ./MODEL_DIR/resnet18.pth --m avg_prob
+
+# Ensemble using majority vote method:
+python ensemble_test.py --an ./MODEL_DIR/alexnet.pth --vgg ./MODEL_DIR/vgg16.pth --res ./MODEL_DIR/resnet18.pth --m majority_vote
